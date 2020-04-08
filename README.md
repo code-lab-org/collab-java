@@ -24,6 +24,10 @@ Sample experiments are defined in the `src/generator` directory. Load an experim
 
 During an experiment, the application writes log files to the default execution directory.
 
+## Acknowledgements
+
+This project was funded, in part, by a National Defense Science and Engineering Graduate (NDSEG) Fellowship.
+
 ## References
 
 P.T. Grogan and O.L. de Weck (2016). "Collaboration and complexity: An experiment on the effect of multi-actor coupled design," *Research in Engineering Design*, vol. 27, pp. 221--235. doi: [10.1007/s00163-016-0214-7](https://doi.org/10.1007/s00163-016-0214-7). 
