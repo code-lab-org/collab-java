@@ -4,7 +4,7 @@ Collaborative Design Tool (in Java)
 
 ## Introduction
 
-This project defines a simple graphical user interface for a multi-actor collaborative design study with surrogate parameter design tasks. It includes a manager GUI to control the advancement of tasks and a designer GUI to modify input variables and visualize output variables.
+This project provides a simple graphical user interface for a multi-actor collaborative design study with surrogate parameter design tasks. It includes a manager application to control the advancement of tasks and a designer application to modify input variables and visualize output variables.
 
 ## Pre-requisites
 
