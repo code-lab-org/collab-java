@@ -14,6 +14,17 @@
     <objects>
         <objectClass>
             <name>HLAobjectRoot</name>
+         	<sharing>Neither</sharing>
+			<attribute>
+			   <name>HLAprivilegeToDeleteObject</name>
+			   <dataType>HLAtoken</dataType>
+			   <updateType>Static</updateType>
+			   <updateCondition>NA</updateCondition>
+			   <ownership>DivestAcquire</ownership>
+			   <sharing>PublishSubscribe</sharing>
+			   <transportation>HLAreliable</transportation>
+			   <order>TimeStamp</order>
+			</attribute>
             <objectClass>
                 <name>Designer</name>
                 <sharing>Neither</sharing>

@@ -19,6 +19,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
 
 import com.jgoodies.looks.plastic.Plastic3DLookAndFeel;
@@ -41,6 +42,8 @@ public class DesignerMain {
 	 * @param args the arguments
 	 */
 	public static void main(final String[] args) {
+		BasicConfigurator.configure();
+		
 		final int designerIndex;
 		// validate designer index
 		if(args.length < 1 || Integer.parseInt(args[0]) < 0) {

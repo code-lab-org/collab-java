@@ -15,10 +15,12 @@
  *****************************************************************************/
 package edu.mit.collab.hla;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,13 +30,13 @@ import javax.swing.JOptionPane;
 import javax.swing.event.EventListenerList;
 
 import org.apache.commons.math3.linear.RealVector;
+import org.apache.log4j.Logger;
 
 import edu.mit.collab.core.Designer;
 import edu.mit.collab.core.Experiment;
 import edu.mit.collab.core.SystemModel;
 import edu.mit.collab.event.DesignerEvent;
 import edu.mit.collab.event.DesignerListener;
-import edu.mit.collab.util.Utilities;
 import hla.rti1516e.AttributeHandleSet;
 import hla.rti1516e.AttributeHandleValueMap;
 import hla.rti1516e.CallbackModel;
@@ -96,6 +98,7 @@ import hla.rti1516e.exceptions.UnsupportedCallbackModel;
  * @author Paul T. Grogan
  */
 public class ManagerAmbassador extends NullFederateAmbassador {
+	private static Logger logger = Logger.getLogger(ManagerAmbassador.class);
 	private static enum DesignerAction {ADD, INPUT_UPDATE, 
 		STATE_UPDATE, REMOVE};
 	
@@ -120,8 +123,9 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 
 	private final RTIambassador rtiAmbassador; // immutable
 	private final EncoderFactory encoderFactory; // immutable
+	private final String federationName; //immutable
+	private final String fomPath; // immutable
 
-    private final Properties properties; // mutable
 	private final HLAfloatVector initialInput, targetOutput, outputs; // mutable
 	private final HLAintegerMatrix inputIndices, outputIndices; // mutable
 	private final HLAunicodeString activeModel; // mutable
@@ -138,17 +142,16 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 *
 	 * @throws RTIinternalError the RTI internal error
 	 */
-	public ManagerAmbassador() throws RTIinternalError {	
-        properties = new Properties();
-        try {
-          InputStream in = getClass().getClassLoader().getResourceAsStream(
-              Utilities.PROPERTIES_PATH);
-          properties.load(in);
-          in.close();
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-        String rtiName = properties.getProperty("rtiName", null);
+	public ManagerAmbassador() throws RTIinternalError {
+		Properties properties = new Properties();
+		try(InputStream input = new FileInputStream("config.properties")) {
+			properties.load(input);
+		} catch (FileNotFoundException e) {
+		} catch (IOException e) { }
+
+	    String rtiName = properties.getProperty("rtiName", null);
+	    federationName = properties.getProperty("federationName", "collab");
+	    fomPath = properties.getProperty("fomPath", "collab.xml");
       
 		// create the RTI factory and store ambassador and encoder objects
 	    RtiFactory rtiFactory = null;
@@ -649,8 +652,7 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		// exceptions if other federates still joined, federation
 		// already destroyed, or not connected
 		try {
-			rtiAmbassador.destroyFederationExecution(
-			    properties.getProperty("federationName", "collab"));
+			rtiAmbassador.destroyFederationExecution(federationName);
 		} catch (FederatesCurrentlyJoined ignored) {
 		} catch (FederationExecutionDoesNotExist ignored) {
 		} catch (NotConnected ignored) {
@@ -708,17 +710,12 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		// try to create the federation execution using the FOM file;
 		// ignore if already exists
 		try {
-			rtiAmbassador.createFederationExecution(
-			    properties.getProperty("federationName", "collab"), 
-			    getClass().getClassLoader().getResource(
-			        properties.getProperty("fomPath", "resources/collab.xml")));
+			rtiAmbassador.createFederationExecution(federationName, new File(fomPath).toURI().toURL());
 		} catch(FederationExecutionAlreadyExists ignored) { }
 		
 		// try to join the federation execution; ignore if already joined
 		try {
-			rtiAmbassador.joinFederationExecution(
-					federateType, properties.getProperty("federationName", "collab"), 
-					new URL[0]);
+			rtiAmbassador.joinFederationExecution(federateType, federationName);
 		} catch(FederateAlreadyExecutionMember ignored) { }
 		
 		// publish and subscribe to object class attributes

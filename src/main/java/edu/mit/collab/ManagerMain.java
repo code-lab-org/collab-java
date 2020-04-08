@@ -19,6 +19,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
 
 import com.jgoodies.looks.plastic.Plastic3DLookAndFeel;
@@ -40,6 +41,8 @@ public class ManagerMain {
 	 * @param args the arguments
 	 */
 	public static void main(final String[] args) {
+		BasicConfigurator.configure();
+		
 		// set jgoodies plastic 3d look and feel for better 
 		// cross-platform support
 		try {

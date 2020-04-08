@@ -55,9 +55,7 @@ import edu.mit.collab.core.Experiment;
  * 
  * @author Paul T. Grogan
  */
-public abstract class Utilities {
-    public static String PROPERTIES_PATH = "resources/config.properties";
-    
+public abstract class Utilities {    
 	// an array of user icons to represent designers
 	// indexed by designer number
 	private static final ImageIcon[] userIcons = new ImageIcon[]{

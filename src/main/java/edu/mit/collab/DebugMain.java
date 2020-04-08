@@ -17,10 +17,10 @@ package edu.mit.collab;
 
 import java.awt.Point;
 
-import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
+import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Logger;
 
 import com.jgoodies.looks.plastic.Plastic3DLookAndFeel;
@@ -41,6 +41,8 @@ public class DebugMain {
 	 * @param args the arguments
 	 */
 	public static void main(String[] args) {
+		BasicConfigurator.configure();
+		
 		// set the look and feel to the jgoodies plastic 3d theme
 		// (looks better across platforms)
 		try {
@@ -71,12 +73,6 @@ public class DebugMain {
 					}
 				} catch (Exception ex) {
 					// show error message
-					JOptionPane.showMessageDialog(null, 
-							"An exception of type " + ex.getMessage() + 
-							" occurred while starting. Please see the " +
-							"stack trace for more details.", 
-							"Error", 
-							JOptionPane.ERROR_MESSAGE);
 					logger.error(ex);
 				}
 			}
