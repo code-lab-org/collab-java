@@ -53,7 +53,7 @@
     	<groupId>openlvc</groupId>
     	<artifactId>portico</artifactId>
     	<scope>system</scope>
-    	<systemPath>${PORTICO_HOME}/lib/portico.jar</systemPath>
+    	<systemPath>${RTI_HOME}/lib/portico.jar</systemPath>
     	<version>2.1.0</version>
     </dependency>
   </dependencies>
