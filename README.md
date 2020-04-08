@@ -1,5 +1,6 @@
-# collab
-Collaborative design tool
+# collab-java
+
+Collaborative Design Tool (in Java)
 
 ## Introduction
 
