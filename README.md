@@ -32,6 +32,6 @@ This project was funded, in part, by a National Defense Science and Engineering 
 
 P.T. Grogan and O.L. de Weck (2016). "Collaboration and complexity: An experiment on the effect of multi-actor coupled design," *Research in Engineering Design*, vol. 27, pp. 221--235. doi: [10.1007/s00163-016-0214-7](https://doi.org/10.1007/s00163-016-0214-7). 
 
-A. Alelyani, Y. Yang, and P.T. Grogan (2017). "Understanding designers' behaviors in parameter design activities," in *2017 ASME International Design Engineering Technical Conferences & Computers and Information in Engineering Conference*, Cleveland, OH. doi: [10.115/DETC2017-68335](https://doi.org/10.115/DETC2017-68335). 
+T. Alelyani, Y. Yang, and P.T. Grogan (2017). "Understanding designers' behaviors in parameter design activities," in *2017 ASME International Design Engineering Technical Conferences & Computers and Information in Engineering Conference*, Cleveland, OH. doi: [10.115/DETC2017-68335](https://doi.org/10.115/DETC2017-68335). 
 
 P.T. Grogan (2018). "Data on multi-actor parameter design tasks by engineering students with variable problem size, coupling, and team size," *Data in Brief*, vol. 20, pp. 1079--1084. doi: [10.1017/dsj.2019.23](https://doi.org/10.1017/dsj.2019.23).
