@@ -1,4 +1,19 @@
-package edu.mit.collab.util;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -15,8 +30,13 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
 
+import edu.mit.collab.util.Utilities;
+
 /**
- * The Class ManualQuantitativeOutputPanel.
+ * An output panel that displays quantitative information about 
+ * outputs and requires manual updating.
+ * 
+ * @author Paul T. Grogan
  */
 public class ManualQuantitativeOutputPanel extends OutputPanel {
 	private static final long serialVersionUID = -3934341529444058089L;
@@ -125,17 +145,11 @@ public class ManualQuantitativeOutputPanel extends OutputPanel {
 		setValue(outputValue);
 	}
 	
-	/* (non-Javadoc)
-	 * @see javax.swing.JComponent#setEnabled(boolean)
-	 */
 	@Override
 	public void setEnabled(boolean enabled) {
 		outputSlider.setEnabled(enabled);
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.OutputPanel#setValue(double)
-	 */
 	@Override
 	public void setValue(double value) {
 		
@@ -167,17 +181,11 @@ public class ManualQuantitativeOutputPanel extends OutputPanel {
 							new Color(0xff,0xcc,0xcc));
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.OutputPanel#isWithinRange()
-	 */
 	@Override
 	public boolean isWithinRange() {
 		return withinTargetRange;
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.OutputPanel#getValue()
-	 */
 	@Override
 	public double getValue() {
 		return outputSlider.getValue()/((double)sliderTicksPerUnit);

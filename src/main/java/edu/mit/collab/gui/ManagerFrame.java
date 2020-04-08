@@ -1,4 +1,19 @@
-package edu.mit.collab.manager;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.gui;
 
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -60,10 +75,12 @@ import org.jfree.chart.renderer.xy.XYItemRenderer;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
-import edu.mit.collab.util.InputPanel;
-import edu.mit.collab.util.InputPanelFactory;
-import edu.mit.collab.util.OutputPanel;
-import edu.mit.collab.util.OutputPanelFactory;
+import edu.mit.collab.core.Designer;
+import edu.mit.collab.core.Experiment;
+import edu.mit.collab.core.SystemModel;
+import edu.mit.collab.event.DesignerEvent;
+import edu.mit.collab.event.DesignerListener;
+import edu.mit.collab.hla.ManagerAmbassador;
 import edu.mit.collab.util.Utilities;
 import hla.rti1516e.exceptions.RTIinternalError;
 
@@ -76,7 +93,7 @@ import hla.rti1516e.exceptions.RTIinternalError;
  * and each of the designers' outputs is also visible. In the manager
  * application, the solution input values are also visible.
  * 
- * @author Paul T. Grogan, ptgrogan@mit.edu
+ * @author Paul T. Grogan
  */
 public class ManagerFrame extends JFrame implements DesignerListener {
 	private static enum Mode {Ready, Initialized, Running, Solved, Complete}
@@ -419,9 +436,6 @@ public class ManagerFrame extends JFrame implements DesignerListener {
 		return menuBar;
 	}	
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.manager.DesignerListener#designerAdded(edu.mit.collab.manager.DesignerEvent)
-	 */
 	@Override
 	public void designerAdded(final DesignerEvent e) {
 		// act on event in swing event thread
@@ -449,9 +463,6 @@ public class ManagerFrame extends JFrame implements DesignerListener {
 		});
 	}
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.manager.DesignerListener#designerInputModified(edu.mit.collab.manager.DesignerEvent)
-	 */
 	@Override
 	public void designerInputModified(final DesignerEvent e) {
 		// act on event in swing event thread
@@ -480,9 +491,6 @@ public class ManagerFrame extends JFrame implements DesignerListener {
 		});
 	}
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.manager.DesignerListener#designerRemoved(edu.mit.collab.manager.DesignerEvent)
-	 */
 	@Override
 	public void designerRemoved(final DesignerEvent e) {
 		// act on event in swing event thread
@@ -495,9 +503,6 @@ public class ManagerFrame extends JFrame implements DesignerListener {
 		});
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.manager.DesignerListener#designerStateModified(edu.mit.collab.manager.DesignerEvent)
-	 */
 	@Override
 	public void designerStateModified(final DesignerEvent e) {
 		SwingUtilities.invokeLater(new Runnable() {

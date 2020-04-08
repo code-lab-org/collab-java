@@ -1,9 +1,24 @@
-package edu.mit.collab.designer;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.core;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealVector;
 
-import edu.mit.collab.util.OutputPanel;
+import edu.mit.collab.gui.OutputPanel;
 
 /**
  * The Manager class is used by a designer to maintain
@@ -11,7 +26,7 @@ import edu.mit.collab.util.OutputPanel;
  * an immutable instance name (upon discovery in the HLA ambassador)
  * however the other data members can be modified.
  * 
- * @author Paul T. Grogan, ptgrogan@mit.edu
+ * @author Paul T. Grogan
  */
 public class Manager {
 	private final String instanceName; // immutable
@@ -40,9 +55,8 @@ public class Manager {
 		outputLabels = new String[0];
 	}
 	
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
+
+	@Override
 	public synchronized boolean equals(Object o) {
 		// managers are equal if they have the same instance name
 		return (o instanceof Manager) 
@@ -169,9 +183,8 @@ public class Manager {
 		return targetOutputs;
 	}
 	
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
+
+	@Override
 	public synchronized int hashCode() {
 		// provide new hashcode function to conform to equals method
 		return instanceName.hashCode();

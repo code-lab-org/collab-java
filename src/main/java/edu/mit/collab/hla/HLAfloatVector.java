@@ -1,4 +1,19 @@
-package edu.mit.collab.util;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.hla;
 
 import hla.rti1516e.encoding.ByteWrapper;
 import hla.rti1516e.encoding.DataElement;
@@ -20,7 +35,7 @@ import org.apache.commons.math3.linear.RealVector;
  * automatically transform data to and from the <code>RealVector</code> object 
  * classes.
  * 
- * @author Paul T. Grogan, ptgrogan@mit.edu
+ * @author Paul T. Grogan
  */
 public class HLAfloatVector implements DataElement {
 	private final HLAvariableArray<HLAfloat64BE> hlaArray;
@@ -44,45 +59,30 @@ public class HLAfloatVector implements DataElement {
 				});
 	}
 	
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.encoding.DataElement#decode(byte[])
-	 */
 	@Override
 	public void decode(byte[] bytes) throws DecoderException {
 		// access built-in function of underlying data type
 		hlaArray.decode(bytes);
 	}
 
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.encoding.DataElement#decode(hla.rti1516e.encoding.ByteWrapper)
-	 */
 	@Override
 	public void decode(ByteWrapper byteWrapper) throws DecoderException {
 		// access built-in function of underlying data type
 		hlaArray.decode(byteWrapper);
 	}
 
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.encoding.DataElement#encode(hla.rti1516e.encoding.ByteWrapper)
-	 */
 	@Override
 	public void encode(ByteWrapper byteWrapper) throws EncoderException {
 		// access built-in function of underlying data type
 		hlaArray.encode(byteWrapper);
 	}
 
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.encoding.DataElement#getEncodedLength()
-	 */
 	@Override
 	public int getEncodedLength() {
 		// access built-in function of underlying data type
 		return hlaArray.getEncodedLength();
 	}
 
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.encoding.DataElement#getOctetBoundary()
-	 */
 	@Override
 	public int getOctetBoundary() {
 		// access built-in function of underlying data type
@@ -119,9 +119,6 @@ public class HLAfloatVector implements DataElement {
 		}
 	}
 	
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.encoding.DataElement#toByteArray()
-	 */
 	@Override
 	public byte[] toByteArray() throws EncoderException {
 		// access built-in function of underlying data type

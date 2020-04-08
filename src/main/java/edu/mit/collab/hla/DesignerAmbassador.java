@@ -1,9 +1,23 @@
-package edu.mit.collab.manager;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.hla;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -14,9 +28,11 @@ import javax.swing.event.EventListenerList;
 
 import org.apache.commons.math3.linear.RealVector;
 
-import edu.mit.collab.util.HLAfloatVector;
-import edu.mit.collab.util.HLAintegerMatrix;
-import edu.mit.collab.util.HLAstringVector;
+import com.google.gson.Gson;
+
+import edu.mit.collab.core.Manager;
+import edu.mit.collab.event.ManagerEvent;
+import edu.mit.collab.event.ManagerListener;
 import edu.mit.collab.util.Utilities;
 import hla.rti1516e.AttributeHandleSet;
 import hla.rti1516e.AttributeHandleValueMap;
@@ -71,20 +87,20 @@ import hla.rti1516e.exceptions.SaveInProgress;
 import hla.rti1516e.exceptions.UnsupportedCallbackModel;
 
 /**
- * The federate ambassador interface to the RTI for the manager application.
+ * The federate ambassador interface to the RTI for the designer application.
  * This class handles all of the interactions with the RTI including setting up
  * the connection to a federation and receiving all messages from other
  * federates.
  * 
- * @author Paul T. Grogan, ptgrogan@mit.edu
+ * @author Paul T. Grogan
  */
-public class ManagerAmbassador extends NullFederateAmbassador {
-	private static enum DesignerAction {ADD, INPUT_UPDATE, 
-		STATE_UPDATE, REMOVE};
-	
+public class DesignerAmbassador extends NullFederateAmbassador {
+	private static enum ManagerAction {ADD, MODEL_UPDATE, 
+		OUTPUT_UPDATE, REMOVE};
+		
 	// the variables below define configuration strings for various
 	// commands issued to the RTI ambassador
-	private static final String federateType = "manager";
+	private static final String federateType = "designer";
 	private static final String managerClassName = "HLAobjectRoot.Manager";
 	private static final String outputAttributeName = "Output";
 	private static final String initialInputAttributeName = "InitialInput";
@@ -99,31 +115,31 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	private static final String indexAttributeName = "Index";
 	private static final String readyAttributeName = "Ready";
 	
-	private transient String objectInstanceName; // set upon connection to RTI
+	private transient String objectInstanceName;  // set upon connection to RTI
 
 	private final RTIambassador rtiAmbassador; // immutable
 	private final EncoderFactory encoderFactory; // immutable
 
     private final Properties properties; // mutable
-	private final HLAfloatVector initialInput, targetOutput, outputs; // mutable
-	private final HLAintegerMatrix inputIndices, outputIndices; // mutable
-	private final HLAunicodeString activeModel; // mutable
-	private final HLAstringVector inputLabels, outputLabels; // mutable
+	private final HLAfloatVector input; // mutable
+	private final HLAinteger32BE index; // mutable
+	private final HLAboolean ready; // mutable
 	private final EventListenerList listenerList = new EventListenerList(); // mutable
-	
+
 	// synchronized mutable map to support multi-threaded application
-	private final Map<ObjectInstanceHandle, Designer> designers = 
+	private final Map<ObjectInstanceHandle, Manager> managers = 
 			Collections.synchronizedMap(
-					new HashMap<ObjectInstanceHandle, Designer>());
+					new HashMap<ObjectInstanceHandle, Manager>());
 	
 	/**
-	 * Instantiates a new manager ambassador.
+	 * Instantiates a new designer ambassador.
 	 *
+	 * @param designerIndex the designer index
 	 * @throws RTIinternalError the RTI internal error
 	 */
-	public ManagerAmbassador() throws RTIinternalError {	
-        properties = new Properties();
-        try {
+	public DesignerAmbassador(int designerIndex) throws RTIinternalError {
+	    properties = new Properties();
+	    try {
           InputStream in = getClass().getClassLoader().getResourceAsStream(
               Utilities.PROPERTIES_PATH);
           properties.load(in);
@@ -131,42 +147,35 @@ public class ManagerAmbassador extends NullFederateAmbassador {
         } catch (IOException e) {
           e.printStackTrace();
         }
-        String rtiName = properties.getProperty("rtiName", null);
-      
-		// create the RTI factory and store ambassador and encoder objects
-	    RtiFactory rtiFactory = null;
-	    if(rtiName == null) {
-	        rtiFactory = RtiFactoryFactory.getRtiFactory();
-	    } else {
-	        rtiFactory = RtiFactoryFactory.getRtiFactory(rtiName);
-	    }
+	    String rtiName = properties.getProperty("rtiName", null);
+	    
+        // create the RTI factory and store ambassador and encoder objects
+        RtiFactory rtiFactory;
+        if(rtiName == null) {
+            rtiFactory = RtiFactoryFactory.getRtiFactory();
+        } else {
+            rtiFactory = RtiFactoryFactory.getRtiFactory(rtiName);
+        }
 		rtiAmbassador = rtiFactory.getRtiAmbassador();
 		encoderFactory = rtiFactory.getEncoderFactory();
 		
 		// create hla-compatible data elements for encoding/decoding values
-		initialInput = new HLAfloatVector(encoderFactory);
-		targetOutput = new HLAfloatVector(encoderFactory);
-		outputs = new HLAfloatVector(encoderFactory);
-		activeModel = encoderFactory.createHLAunicodeString();
-		inputIndices = new HLAintegerMatrix(encoderFactory);
-		outputIndices = new HLAintegerMatrix(encoderFactory);
-		inputLabels = new HLAstringVector(encoderFactory);
-		outputLabels = new HLAstringVector(encoderFactory);
+		input = new HLAfloatVector(encoderFactory);
+		index = encoderFactory.createHLAinteger32BE(designerIndex);
+		ready = encoderFactory.createHLAboolean();
 	}
 	
 	/**
-	 * Adds the designer listener.
+	 * Adds the manager listener.
 	 *
 	 * @param listener the listener
 	 */
-	public void addDesignerListener(DesignerListener listener) {
+	public void addManagerListener(ManagerListener listener) {
 		// add listener to list
-		listenerList.add(DesignerListener.class, listener);
+		listenerList.add(ManagerListener.class, listener);
 	}
 	
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#discoverObjectInstance(hla.rti1516e.ObjectInstanceHandle, hla.rti1516e.ObjectClassHandle, java.lang.String)
-	 */
+	@Override
 	public void discoverObjectInstance(ObjectInstanceHandle theObject,
 			ObjectClassHandle theObjectClass, 
 			String objectName) {
@@ -174,48 +183,70 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		discoverObjectInstance(theObject, theObjectClass, objectName, null);
 	}
 	
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#discoverObjectInstance(hla.rti1516e.ObjectInstanceHandle, hla.rti1516e.ObjectClassHandle, java.lang.String)
-	 */
+	@Override
 	public void discoverObjectInstance(ObjectInstanceHandle theObject,
 			ObjectClassHandle theObjectClass,
 			String objectName,
 			FederateHandle producingFederate) {
 		// this method is called by the RTI when a new object is "discovered"
-		// in this case, we are only expecting designers which should be added
-		// to the list of discovered designers and request attribute updates
+		// in this case, we are only expecting managers which should be added
+		// to the list of discovered managers and request attribute updates
 		try {
 			// check if object is a designer (shouldn't be anything else!)
 			if(theObjectClass.equals(
-					rtiAmbassador.getObjectClassHandle(designerClassName))) {
-				// create new designer object
-				Designer design = new Designer(objectName);
+					rtiAmbassador.getObjectClassHandle(managerClassName))) {
+				// create new object model
+				Manager manager = new Manager(objectName);
 				
-				// add object class handle and designer object to 
+				// add object class handle and manager object to 
 				// thread-safe map using a synchronized block
-				synchronized(designers) {
-					designers.put(theObject, design);
+				synchronized(managers) {
+					managers.put(theObject, manager);
 				}
-				
+
 				// create a new attribute handle set to request updates of the
-				// designer's attributes
+				// manager's attributes
 				AttributeHandleSet attributes = rtiAmbassador
 						.getAttributeHandleSetFactory().create();
-				// add index attribute
+				// add initial input attribute
 				attributes.add(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(designerClassName),
-						indexAttributeName));
-				// add ready attribute
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						initialInputAttributeName));
+				// add target output attribute
 				attributes.add(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(designerClassName),
-						readyAttributeName));
-				// add input attribute
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						targetOutputAttributeName));
+				// add output attribute
 				attributes.add(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(designerClassName),
-						inputAttributeName));
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						outputAttributeName));
+				// add active model attribute
+				attributes.add(rtiAmbassador.getAttributeHandle(
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						activeModelAttributeName));
+				// add input indices attribute
+				attributes.add(rtiAmbassador.getAttributeHandle(
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						inputIndicesAttributeName));
+				// add output indices attribute
+				attributes.add(rtiAmbassador.getAttributeHandle(
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						outputIndicesAttributeName));
+				// add input labels attribute
+				attributes.add(rtiAmbassador.getAttributeHandle(
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						inputLabelsAttributeName));
+				// add output labels attribute
+				attributes.add(rtiAmbassador.getAttributeHandle(
+						rtiAmbassador.getObjectClassHandle(managerClassName), 
+						outputLabelsAttributeName));
 				// issue request attribute value update service call
 				rtiAmbassador.requestAttributeValueUpdate(theObject, 
 						attributes, new byte[0]);
+				
+				// notify listeners that a manager has been discovered
+				fireManagerEvent(ManagerAction.ADD, 
+						new ManagerEvent(this, manager));
 			}
 		} catch (Exception ex) {
 			// in the case of an exception (from the request attribute value
@@ -229,31 +260,30 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	}
 	
 	/**
-	 * Fires a designer event corresponding to an observed action.
+	 * Fires a manager event corresponding to an observed action.
 	 *
 	 * @param action the action
 	 * @param event the event
 	 */
-	private void fireDesignerEvent(DesignerAction action, 
-			DesignerEvent event) {
-		// get the list of designer listeners
-		DesignerListener[] listeners = listenerList.getListeners(
-				DesignerListener.class);
-		
+	private void fireManagerEvent(ManagerAction action, ManagerEvent event) {
+		// get the list of manager listeners
+		ManagerListener[] listeners = listenerList.getListeners(
+				ManagerListener.class);
+
 		// for each listener, notify using the appropriate method
 		for(int i = 0; i < listeners.length; i++) {
 			switch(action) {
 			case ADD:
-				listeners[i].designerAdded(event);
+				listeners[i].managerAdded(event);
 				break;
-			case INPUT_UPDATE:
-				listeners[i].designerInputModified(event);
+			case MODEL_UPDATE:
+				listeners[i].managerModelModified(event);
 				break;
-			case STATE_UPDATE:
-				listeners[i].designerStateModified(event);
+			case OUTPUT_UPDATE:
+				listeners[i].managerOutputModified(event);
 				break;
 			case REMOVE:
-				listeners[i].designerRemoved(event);
+				listeners[i].managerRemoved(event);
 			}
 		}
 	}
@@ -266,10 +296,7 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	public String getInstanceName() {
 		return objectInstanceName;
 	}
-	
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#provideAttributeValueUpdate(hla.rti1516e.ObjectInstanceHandle, hla.rti1516e.AttributeHandleSet, byte[])
-	 */
+
 	public void provideAttributeValueUpdate(ObjectInstanceHandle theObject,
 			AttributeHandleSet theAttributes, 
 			byte[] userSuppliedTag) {
@@ -283,94 +310,41 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 					objectInstanceName))) {
 				// create an attribute handle value map to store data
 				AttributeHandleValueMap attributes = rtiAmbassador.
-						getAttributeHandleValueMapFactory().create(6);
-
-				// if the initial input is requested, add it to the map
+						getAttributeHandleValueMapFactory().create(3);
+				
+				// if the input is requested, add it to the map
 				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						initialInputAttributeName))) {
+						rtiAmbassador.getObjectClassHandle(designerClassName), 
+						inputAttributeName))) {
 					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							initialInputAttributeName), 
-							initialInput.toByteArray());
+							rtiAmbassador.getObjectClassHandle(designerClassName), 
+							inputAttributeName), input.toByteArray());
 				}
 				
-				// if the target output is requested, add it to the map
+				// if the index is requested, add it to the map
 				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						targetOutputAttributeName))) {
+						rtiAmbassador.getObjectClassHandle(designerClassName), 
+						indexAttributeName))) {
 					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							targetOutputAttributeName), 
-							targetOutput.toByteArray());
+							rtiAmbassador.getObjectClassHandle(designerClassName), 
+							indexAttributeName), index.toByteArray());
 				}
-
-				// if the outputs are requested, add it to the map
+				
+				// if the ready state is requested, add it to the map
 				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						outputAttributeName))) {
+						rtiAmbassador.getObjectClassHandle(designerClassName), 
+						readyAttributeName))) {
 					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							outputAttributeName), 
-							outputs.toByteArray());
-				}
-
-				// if the active model is requested, add it to the map
-				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						activeModelAttributeName))) {
-					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							activeModelAttributeName), 
-							activeModel.toByteArray());
-				}
-
-				// if the input indices are requested, add it to the map
-				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						inputIndicesAttributeName))) {
-					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							inputIndicesAttributeName), 
-							inputIndices.toByteArray());
-				}
-
-				// if the output indices are requested, add it to the map
-				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						outputIndicesAttributeName))) {
-					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							outputIndicesAttributeName), 
-							outputIndices.toByteArray());
-				}
-
-				// if the input labels are requested, add it to the map
-				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						inputLabelsAttributeName))) {
-					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							inputLabelsAttributeName), 
-							inputLabels.toByteArray());
-				}
-
-				// if the output labels are requested, add it to the map
-				if(theAttributes.contains(rtiAmbassador.getAttributeHandle(
-						rtiAmbassador.getObjectClassHandle(managerClassName), 
-						outputLabelsAttributeName))) {
-					attributes.put(rtiAmbassador.getAttributeHandle(
-							rtiAmbassador.getObjectClassHandle(managerClassName), 
-							outputLabelsAttributeName), 
-							outputLabels.toByteArray());
+							rtiAmbassador.getObjectClassHandle(designerClassName),
+							readyAttributeName), ready.toByteArray());
 				}
 				
 				// use the rti's update attribute value service to issue updates
 				rtiAmbassador.updateAttributeValues(
-						rtiAmbassador.getObjectInstanceHandle(objectInstanceName), 
+						rtiAmbassador.getObjectInstanceHandle(objectInstanceName),
 						attributes, new byte[0]);
 			}
-		}  catch (Exception ex) {
+		} catch (Exception ex) {
 			// in the case of an exception (from the update attribute value
 			// call), print stack trace and show error message
 			ex.printStackTrace();
@@ -380,7 +354,7 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 					"Error", JOptionPane.ERROR_MESSAGE);
 		}
 	}
-
+	
 	/**
 	 * Configures the published object class attributes.
 	 *
@@ -395,54 +369,31 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 * @throws RestoreInProgress the restore in progress
 	 */
 	private void publish() 
-			throws FederateNotExecutionMember, NotConnected, 
-			NameNotFound, InvalidObjectClassHandle, RTIinternalError, 
-			AttributeNotDefined, ObjectClassNotDefined, SaveInProgress, 
-			RestoreInProgress {
+			throws FederateNotExecutionMember, NotConnected, NameNotFound, 
+			InvalidObjectClassHandle, RTIinternalError, AttributeNotDefined, 
+			ObjectClassNotDefined, SaveInProgress, RestoreInProgress {
 		// create a new attribute handle set to store attributes
-		AttributeHandleSet attributeHandleSet = rtiAmbassador
-				.getAttributeHandleSetFactory().create();
-		// add the outputs to the set
+		AttributeHandleSet attributeHandleSet = rtiAmbassador.
+				getAttributeHandleSetFactory().create();
+		// add the input to the set
 		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				outputAttributeName));
-		// add the initial input to the set
+				rtiAmbassador.getObjectClassHandle(designerClassName), 
+				inputAttributeName));
+		// add the index to the set
 		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				initialInputAttributeName));
-		// add the target output to the set
+				rtiAmbassador.getObjectClassHandle(designerClassName), 
+				indexAttributeName));
+		// add the ready state to the set
 		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				targetOutputAttributeName));
-		// add the active model to the set
-		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				activeModelAttributeName));
-		// add the input indices to the set
-		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				inputIndicesAttributeName));
-		// add the output indices to the set
-		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				outputIndicesAttributeName));
-		// add the input labels to the set
-		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				inputLabelsAttributeName));
-		// add the output labels to the set
-		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				outputLabelsAttributeName));
+				rtiAmbassador.getObjectClassHandle(designerClassName), 
+				readyAttributeName));
 		// use the RTI service to publish object class attributes
 		rtiAmbassador.publishObjectClassAttributes(
-				rtiAmbassador.getObjectClassHandle(managerClassName),
+				rtiAmbassador.getObjectClassHandle(designerClassName),
 				attributeHandleSet);
 	}
-	
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#reflectAttributeValues(hla.rti1516e.ObjectInstanceHandle, hla.rti1516e.AttributeHandleValueMap, byte[], hla.rti1516e.OrderType, hla.rti1516e.TransportationTypeHandle, hla.rti1516e.LogicalTime, hla.rti1516e.OrderType, hla.rti1516e.MessageRetractionHandle, hla.rti1516e.FederateAmbassador.SupplementalReflectInfo)
-	 */
+
+	@Override
 	public void reflectAttributeValues(ObjectInstanceHandle theObject,
 			AttributeHandleValueMap theAttributes,
 			byte[] userSuppliedTag,
@@ -455,71 +406,207 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		// this method is called by the RTI when remote objects update their
 		// values. this method must update any local representations of the 
 		// remote objects to reflect the processed updates
+		
+		// create a gson object to help with log message formatting
+		Gson gson = new Gson();
+		
 		try {
 			// check whether the object has been previously discovered
-			Designer designer = null;
-			synchronized(designers) {
-				designer = designers.get(theObject);
+			Manager manager = null;
+			synchronized(managers) {
+				manager = managers.get(theObject);
 			}
 			
-			if(designer != null) {
-				// get the data corresponding to the index attribute
-				ByteWrapper wrapper = theAttributes.getValueReference(
-						rtiAmbassador.getAttributeHandle(
-								rtiAmbassador.getObjectClassHandle(
-										designerClassName), 
-								indexAttributeName));
-				if(wrapper != null) {
-					// wrapper has data; decode into an HLA data element
-					HLAinteger32BE index = encoderFactory.createHLAinteger32BE();
-					index.decode(wrapper);
-					
-					// designers can only update their index once; process
-					// update only if the current index is < 0 (uninitialized)
-					if(designer.getIndex() < 0) {
-						// update index value and fire event to notify
-						// listeners that a designer has been "added" 
-						// now that its index is defined
-						designer.setIndex(index.getValue());
-						fireDesignerEvent(DesignerAction.ADD, 
-								new DesignerEvent(this, designer));
-					}
-				}
+			// if manager has not been discovered, simply return
+			if(manager == null) {
+				return;
+			}
+			
+			// get the data corresponding to the active model attribute
+			ByteWrapper wrapper = theAttributes.getValueReference(
+					rtiAmbassador.getAttributeHandle(
+							rtiAmbassador.getObjectClassHandle(
+									managerClassName), 
+									activeModelAttributeName));
+			
+			if(wrapper != null) {
+				// active model has changed -- start a complete model update
 				
-				// get the data corresponding to the input attribute
+				// decode into an HLA data element
+				HLAunicodeString string = 
+						encoderFactory.createHLAunicodeString();
+				string.decode(wrapper);
+				System.out.println("Designer " + (index.getValue()+1) +
+						" Log: setting manager active model to " + 
+						string.getValue());
+
+				// update manager object
+				manager.setActiveModel(string.getValue());
+				
+				// get the data corresponding to the initial input attribute
 				wrapper = theAttributes.getValueReference(
 						rtiAmbassador.getAttributeHandle(
 								rtiAmbassador.getObjectClassHandle(
-										designerClassName), 
-								inputAttributeName));
+										managerClassName), 
+								initialInputAttributeName));
+				
 				if(wrapper != null) {
 					// wrapper has data; decode into an HLA data element
-					HLAfloatVector input = new HLAfloatVector(encoderFactory);
-					input.decode(wrapper);
+					HLAfloatVector vector = new HLAfloatVector(encoderFactory);
+					vector.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) +
+							" Log: setting manager initial input to " + 
+							vector.getValue());
 					
-					// update input value and fire event to notify listeners
-					designer.setInputVector(input.getValue());
-					fireDesignerEvent(DesignerAction.INPUT_UPDATE, 
-							new DesignerEvent(this, designer));
+					// update manager object
+					manager.setInitialInput(vector.getValue());
 				}
 				
-				// get the data corresponding to the ready attribute
+				// get the data corresponding to the target output attribute
 				wrapper = theAttributes.getValueReference(
 						rtiAmbassador.getAttributeHandle(
 								rtiAmbassador.getObjectClassHandle(
-										designerClassName), 
-								readyAttributeName));
+										managerClassName), 
+										targetOutputAttributeName));
+				
 				if(wrapper != null) {
 					// wrapper has data; decode into an HLA data element
-					HLAboolean ready = encoderFactory.createHLAboolean();
-					ready.decode(wrapper);
-					
-					// update ready value and fire event to notify listeners
-					designer.setReady(ready.getValue());
-					fireDesignerEvent(DesignerAction.STATE_UPDATE, 
-							new DesignerEvent(this, designer));
+					HLAfloatVector vector = new HLAfloatVector(encoderFactory);
+					vector.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) +
+							" Log: setting manager target output to " + 
+							vector.getValue());
+
+					// update manager object
+					manager.setTargetOutput(vector.getValue());
 				}
-			} 
+				
+
+				// get the data corresponding to the output attribute
+				wrapper = theAttributes.getValueReference(
+						rtiAmbassador.getAttributeHandle(
+								rtiAmbassador.getObjectClassHandle(
+										managerClassName), 
+										outputAttributeName));
+				if(wrapper != null) {
+					// wrapper has data; decode into an HLA data element
+					HLAfloatVector vector = 
+							new HLAfloatVector(encoderFactory);
+					vector.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) +
+							" Log: setting manager output to " + 
+							vector.getValue());
+
+					// update manager object
+					manager.setOutput(vector.getValue());
+				}
+
+				// get the data corresponding to the input indices attribute
+				wrapper = theAttributes.getValueReference(
+						rtiAmbassador.getAttributeHandle(
+								rtiAmbassador.getObjectClassHandle(
+										managerClassName),
+										inputIndicesAttributeName));
+				if(wrapper != null) {
+					// wrapper has data; decode into an HLA data element
+					HLAintegerMatrix matrix = 
+							new HLAintegerMatrix(encoderFactory);
+					matrix.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) +
+							" Log: setting manager input indices to " + 
+							gson.toJson(matrix.getValue()));
+
+					// update manager object
+					manager.setInputIndices(matrix.getValue());
+				}
+
+				// get the data corresponding to the output indices attribute
+				wrapper = theAttributes.getValueReference(
+						rtiAmbassador.getAttributeHandle(
+								rtiAmbassador.getObjectClassHandle(
+										managerClassName), 
+										outputIndicesAttributeName));
+				
+				if(wrapper != null) {
+					// wrapper has data; decode into an HLA data element
+					HLAintegerMatrix matrix = 
+							new HLAintegerMatrix(encoderFactory);
+					matrix.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) + 
+							" Log: setting manager output indices to " + 
+							gson.toJson(matrix.getValue()));
+
+					// update manager object
+					manager.setOutputIndices(matrix.getValue());
+				}
+
+				// get the data corresponding to the input labels attribute
+				wrapper = theAttributes.getValueReference(
+						rtiAmbassador.getAttributeHandle(
+								rtiAmbassador.getObjectClassHandle(
+										managerClassName), 
+										inputLabelsAttributeName));
+				
+				if(wrapper != null) {
+					// wrapper has data; decode into an HLA data element
+					HLAstringVector vector = 
+							new HLAstringVector(encoderFactory);
+					vector.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) + 
+							" Log: setting manager input labels to " + 
+							gson.toJson(vector.getValue()));
+
+					// update manager object
+					manager.setInputLabels(vector.getValue());
+				}
+
+				// get the data corresponding to the output labels attribute
+				wrapper = theAttributes.getValueReference(
+						rtiAmbassador.getAttributeHandle(
+								rtiAmbassador.getObjectClassHandle(
+										managerClassName), 
+										outputLabelsAttributeName));
+				
+				if(wrapper != null) {
+					// wrapper has data; decode into an HLA data element
+					HLAstringVector vector = 
+							new HLAstringVector(encoderFactory);
+					vector.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) + 
+							" Log: setting manager output labels to " + 
+							gson.toJson(vector.getValue()));
+
+					// update manager object
+					manager.setOutputLabels(vector.getValue());
+				}
+
+				// update manager model
+				fireManagerEvent(ManagerAction.MODEL_UPDATE, 
+						new ManagerEvent(this, manager));
+			} else {
+				// get the data corresponding to the output attribute
+				wrapper = theAttributes.getValueReference(
+						rtiAmbassador.getAttributeHandle(
+								rtiAmbassador.getObjectClassHandle(
+										managerClassName), 
+										outputAttributeName));
+				if(wrapper != null) {
+					// wrapper has data; decode into an HLA data element
+					HLAfloatVector vector = 
+							new HLAfloatVector(encoderFactory);
+					vector.decode(wrapper);
+					System.out.println("Designer " + (index.getValue()+1) +
+							" Log: setting manager output to " + 
+							vector.getValue());
+
+					// update manager object and set flag to update output
+					manager.setOutput(vector.getValue());
+					
+					// fire update event
+					fireManagerEvent(ManagerAction.OUTPUT_UPDATE, 
+							new ManagerEvent(this, manager));
+				}
+			}
 		} catch (Exception ex) {
 			// in the case of an exception (from the various RTI calls), 
 			// print stack trace and show error message
@@ -531,9 +618,7 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		}
 	}
 
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#reflectAttributeValues(hla.rti1516e.ObjectInstanceHandle, hla.rti1516e.AttributeHandleValueMap, byte[], hla.rti1516e.OrderType, hla.rti1516e.TransportationTypeHandle, hla.rti1516e.LogicalTime, hla.rti1516e.OrderType, hla.rti1516e.FederateAmbassador.SupplementalReflectInfo)
-	 */
+	@Override
 	public void reflectAttributeValues(ObjectInstanceHandle theObject,
 			AttributeHandleValueMap theAttributes,
 			byte[] userSuppliedTag,
@@ -544,13 +629,11 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 			SupplementalReflectInfo reflectInfo) {
 		// re-direct method to single method signature
 		reflectAttributeValues(theObject, theAttributes, userSuppliedTag, 
-				sentOrdering, theTransport, theTime, receivedOrdering, null, 
-				reflectInfo);
+				sentOrdering, theTransport, theTime, receivedOrdering, 
+				null, reflectInfo);
 	}
-
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#reflectAttributeValues(hla.rti1516e.ObjectInstanceHandle, hla.rti1516e.AttributeHandleValueMap, byte[], hla.rti1516e.OrderType, hla.rti1516e.TransportationTypeHandle, hla.rti1516e.FederateAmbassador.SupplementalReflectInfo)
-	 */
+	
+	@Override
 	public void reflectAttributeValues(ObjectInstanceHandle theObject,
 			AttributeHandleValueMap theAttributes,
 			byte[] userSuppliedTag,
@@ -567,14 +650,12 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 *
 	 * @param listener the listener
 	 */
-	public void removeDesignerListener(DesignerListener listener) {
-		// remove the listener from the list
-		listenerList.remove(DesignerListener.class, listener);
+	public void removeManagerListener(ManagerListener listener) {
+		// remove the lister from the list
+		listenerList.remove(ManagerListener.class, listener);
 	}
 
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#removeObjectInstance(hla.rti1516e.ObjectInstanceHandle, byte[], hla.rti1516e.OrderType, hla.rti1516e.LogicalTime, hla.rti1516e.OrderType, hla.rti1516e.MessageRetractionHandle, hla.rti1516e.FederateAmbassador.SupplementalRemoveInfo)
-	 */
+	@Override
 	public void removeObjectInstance(ObjectInstanceHandle theObject,
 			byte[] userSuppliedTag,
 			OrderType sentOrdering,
@@ -582,21 +663,19 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 			OrderType receivedOrdering,
 			MessageRetractionHandle retractionHandle,
 			SupplementalRemoveInfo removeInfo) {
-		// try to remove designer from the designer map
-		Designer designer = null;
-		synchronized(designers) {
-			designer = designers.remove(theObject);
+		// try to remove manager from the manager map
+		Manager manager = null;
+		synchronized(managers) {
+			manager = managers.remove(theObject);
 		}
-		if(designer != null) {
-			// notify listeners that designer has been removed
-			fireDesignerEvent(DesignerAction.REMOVE, 
-					new DesignerEvent(this, designer));
+		if(manager != null) {
+			// notify listeners that manager has been removed
+			fireManagerEvent(ManagerAction.REMOVE, 
+					new ManagerEvent(this, manager));
 		}
 	}
 
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#removeObjectInstance(hla.rti1516e.ObjectInstanceHandle, byte[], hla.rti1516e.OrderType, hla.rti1516e.LogicalTime, hla.rti1516e.OrderType, hla.rti1516e.FederateAmbassador.SupplementalRemoveInfo)
-	 */
+	@Override
 	public void removeObjectInstance(ObjectInstanceHandle theObject,
 			byte[] userSuppliedTag,
 			OrderType sentOrdering,
@@ -608,9 +687,7 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 				theTime, receivedOrdering, null, removeInfo);
 	}
 	
-	/* (non-Javadoc)
-	 * @see hla.rti1516e.NullFederateAmbassador#removeObjectInstance(hla.rti1516e.ObjectInstanceHandle, byte[], hla.rti1516e.OrderType, hla.rti1516e.FederateAmbassador.SupplementalRemoveInfo)
-	 */
+	@Override
 	public void removeObjectInstance(ObjectInstanceHandle theObject,
 			byte[] userSuppliedTag,
 			OrderType sentOrdering,
@@ -619,10 +696,9 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		removeObjectInstance(theObject, userSuppliedTag, sentOrdering, 
 				null, null, null, removeInfo);
 	}
-	
+
 	/**
-	 * Shuts down the application. Resigns from the federation execution, 
-	 * attempts to destroy federation execution, and disconnects from the RTI.
+	 * Shut down.
 	 *
 	 * @throws InvalidResignAction the invalid resign action
 	 * @throws OwnershipAcquisitionPending the ownership acquisition pending
@@ -648,8 +724,7 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		// exceptions if other federates still joined, federation
 		// already destroyed, or not connected
 		try {
-			rtiAmbassador.destroyFederationExecution(
-			    properties.getProperty("federationName", "collab"));
+			rtiAmbassador.destroyFederationExecution(properties.getProperty("federationName", "collab"));
 		} catch (FederatesCurrentlyJoined ignored) {
 		} catch (FederationExecutionDoesNotExist ignored) {
 		} catch (NotConnected ignored) {
@@ -658,11 +733,9 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		// disconnect from the rti
 		rtiAmbassador.disconnect();
 	}
-	
+
 	/**
-	 * Starts up the application. Connects to the RTI, creates/joins the 
-	 * federation execution, publishes and subscribes to appropriate object
-	 * attributes, and registers the manager object class instance.
+	 * Start up.
 	 *
 	 * @throws ConnectionFailed the connection failed
 	 * @throws InvalidLocalSettingsDesignator the invalid local settings designator
@@ -673,7 +746,7 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 * @throws ErrorReadingFDD the error reading FDD
 	 * @throws CouldNotOpenFDD the could not open FDD
 	 * @throws NotConnected the not connected
-	 * @throws MalformedURLException the malformed url exception
+	 * @throws MalformedURLException the malformed URL exception
 	 * @throws CouldNotCreateLogicalTimeFactory the could not create logical time factory
 	 * @throws FederateNameAlreadyInUse the federate name already in use
 	 * @throws FederationExecutionDoesNotExist the federation execution does not exist
@@ -684,8 +757,8 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 * @throws InvalidObjectClassHandle the invalid object class handle
 	 * @throws AttributeNotDefined the attribute not defined
 	 * @throws ObjectClassNotDefined the object class not defined
-	 * @throws ObjectClassNotPublished 
-	 * @throws ObjectInstanceNotKnown 
+	 * @throws ObjectInstanceNotKnown the object instance not known
+	 * @throws ObjectClassNotPublished the object class not published
 	 */
 	public void startUp() 
 			throws ConnectionFailed, InvalidLocalSettingsDesignator, 
@@ -715,24 +788,23 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 		
 		// try to join the federation execution; ignore if already joined
 		try {
-			rtiAmbassador.joinFederationExecution(
-					federateType, properties.getProperty("federationName", "collab"), 
-					new URL[0]);
+			rtiAmbassador.joinFederationExecution("Designer " + index.getValue(),
+					federateType, properties.getProperty("federationName", "collab"));
 		} catch(FederateAlreadyExecutionMember ignored) { }
 		
 		// publish and subscribe to object class attributes
 		publish();
 		subscribe();
-		
+
 		// register the object instance name
 		objectInstanceName = rtiAmbassador.getObjectInstanceName(
 				rtiAmbassador.registerObjectInstance(
 						rtiAmbassador.getObjectClassHandle(
-								managerClassName)));
+								designerClassName)));
 	}
 	
 	/**
-	 * Subscribe to designer object class attributes.
+	 * Subscribe.
 	 *
 	 * @throws FederateNotExecutionMember the federate not execution member
 	 * @throws NotConnected the not connected
@@ -746,34 +818,54 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 */
 	private void subscribe() 
 			throws FederateNotExecutionMember, NotConnected, 
-			AttributeNotDefined, ObjectClassNotDefined, 
-			SaveInProgress, RestoreInProgress, RTIinternalError, 
-			NameNotFound, InvalidObjectClassHandle {
+			AttributeNotDefined, ObjectClassNotDefined, SaveInProgress, 
+			RestoreInProgress, RTIinternalError, NameNotFound, 
+			InvalidObjectClassHandle {
 		// create an attribute handle set
 		AttributeHandleSet attributeHandleSet = rtiAmbassador
 				.getAttributeHandleSetFactory().create();
-		// add the input attribute
+		// add the initial input attribute
 		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(designerClassName), 
-				inputAttributeName));
-		// add the index attribute
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				initialInputAttributeName));
+		// add the target output attribute
 		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(designerClassName), 
-				indexAttributeName));
-		// add the ready attribute
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				targetOutputAttributeName));
+		// add the output attribute
 		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(designerClassName), 
-				readyAttributeName));
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				outputAttributeName));
+		// add the active model attribute
+		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				activeModelAttributeName));
+		// add the input indices attribute
+		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				inputIndicesAttributeName));
+		// add the output indices attribute
+		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				outputIndicesAttributeName));
+		// add the input labels indices attribute
+		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				inputLabelsAttributeName));
+		// add the output labels attribute
+		attributeHandleSet.add(rtiAmbassador.getAttributeHandle(
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
+				outputLabelsAttributeName));
 		// use the RTI service to subscribe to the defined attributes
 		rtiAmbassador.subscribeObjectClassAttributes(
-				rtiAmbassador.getObjectClassHandle(designerClassName), 
+				rtiAmbassador.getObjectClassHandle(managerClassName), 
 				attributeHandleSet);
 	}
 	
 	/**
-	 * Sends updates for a modified system model.
+	 * Update index attribute.
 	 *
-	 * @param systemModel the system model
+	 * @param indexValue the index value
 	 * @throws FederateNotExecutionMember the federate not execution member
 	 * @throws NotConnected the not connected
 	 * @throws NameNotFound the name not found
@@ -786,126 +878,22 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 * @throws SaveInProgress the save in progress
 	 * @throws RestoreInProgress the restore in progress
 	 */
-	public void updateModelAttributes(Experiment experiment) 
+	public void updateIndexAttribute(int indexValue) 
 			throws FederateNotExecutionMember, NotConnected, NameNotFound, 
 			InvalidObjectClassHandle, RTIinternalError, EncoderException, 
 			AttributeNotOwned, AttributeNotDefined, ObjectInstanceNotKnown, 
 			SaveInProgress, RestoreInProgress {
-		// get the active model from the experiment
-		SystemModel model = experiment==null ? 
-				null : experiment.getActiveModel();
 		// create an attribute handle value map to store data
-		AttributeHandleValueMap attributes = 
-				rtiAmbassador.getAttributeHandleValueMapFactory().create(6);
+		AttributeHandleValueMap attributes = rtiAmbassador
+				.getAttributeHandleValueMapFactory().create(1);
 		
-		// initial input
-		if(model != null) {
-			// if model is not null, set initial input
-			initialInput.setValue(model.getInitialVector());
-		}
-		// add initial input to map
+		// set HLA data element value and add to map
+		index.setValue(indexValue);
 		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				initialInputAttributeName), 
-				initialInput.toByteArray());
-		
-		// target output
-		if(model != null) {
-			// if model is not null, set target output
-			targetOutput.setValue(model.getTargetVector());
-		}
-		// add target output to map
-		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				targetOutputAttributeName), 
-				targetOutput.toByteArray());
-		
-		// output
-		if(model != null) {
-			// if model is not null, set output to output of initial inputs
-			outputs.setValue(model.getOutputVector(model.getInitialVector()));
-		}
-		// add output to map
-		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				outputAttributeName), 
-				outputs.toByteArray());
-		
-		// input labels
-		if(model != null) {
-			// if model is not null, set input labels
-			inputLabels.setValue(model.getInputLabels());
-		}
-		// add input labels to map
-		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				inputLabelsAttributeName), 
-				inputLabels.toByteArray());
-		
-		// output labels
-		if(model != null) {
-			// if model is not null, set output labels
-			outputLabels.setValue(model.getOutputLabels());
-		}
-		// add output labels to map
-		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				outputLabelsAttributeName), 
-				outputLabels.toByteArray());
-		
-		// active model
-		if(experiment == null) {
-			// if experiment is null, set active model to empty string
-			activeModel.setValue("");
-		} else if(experiment.isReady()) {
-			// if experiment is ready, set active model string
-			activeModel.setValue("Ready...");
-		} else if(experiment.isComplete()) {
-			// if experiment is complete, set active model string
-			activeModel.setValue("Complete!");
-		} else {
-			// otherwise, set active model to model name
-			activeModel.setValue(model.getName());
-		}
-		// add active model to map
-		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				activeModelAttributeName), 
-				activeModel.toByteArray());
-		
-		// input indices
-		if(experiment==null) {
-			// if experiment is null, use trivial input indices
-			inputIndices.setValue(new int[0][0]);
-		} else if(model == null) {
-			// if model is null, use nearly-trivial input indices
-			inputIndices.setValue(new int[experiment.getNumberDesigners()][0]);
-		} else {
-			// otherwise use model input indices
-			inputIndices.setValue(model.getInputIndices());
-		}
-		// add input indices to map
-		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				inputIndicesAttributeName), 
-				inputIndices.toByteArray());
-		
-		// output indices
-		if(experiment==null) {
-			// if experiment is null, use trivial output indices
-			outputIndices.setValue(new int[0][0]);
-		} else if(model == null) {
-			// if model is null, use nearly-trivial output indices
-			outputIndices.setValue(new int[experiment.getNumberDesigners()][0]);
-		} else {
-			// otherwise use model output indices
-			outputIndices.setValue(model.getOutputIndices());
-		}
-		// add output indices to map
-		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				outputIndicesAttributeName), 
-				outputIndices.toByteArray());
+				rtiAmbassador.getObjectClassHandle(designerClassName), 
+				indexAttributeName), index.toByteArray());
+		System.out.println("Designer " + (index.getValue()+1) + 
+				" Log: setting index value to " + index.getValue());
 		
 		// use RTI service to update attribute values using map
 		rtiAmbassador.updateAttributeValues(
@@ -914,9 +902,9 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	}
 	
 	/**
-	 * Updates the output attribute.
+	 * Update input attribute.
 	 *
-	 * @param outputVector the output vector
+	 * @param inputValue the input value
 	 * @throws FederateNotExecutionMember the federate not execution member
 	 * @throws NotConnected the not connected
 	 * @throws NameNotFound the name not found
@@ -929,22 +917,63 @@ public class ManagerAmbassador extends NullFederateAmbassador {
 	 * @throws SaveInProgress the save in progress
 	 * @throws RestoreInProgress the restore in progress
 	 */
-	public void updateOutputAttributes(RealVector outputVector) 
+	public void updateInputAttribute(RealVector inputValue) 
 			throws FederateNotExecutionMember, NotConnected, NameNotFound, 
 			InvalidObjectClassHandle, RTIinternalError, EncoderException, 
 			AttributeNotOwned, AttributeNotDefined, ObjectInstanceNotKnown, 
 			SaveInProgress, RestoreInProgress {
 		// create an attribute handle value map to store data
-		AttributeHandleValueMap attributes = 
-				rtiAmbassador.getAttributeHandleValueMapFactory().create(1);
-		// set HLA data element to output value
-		outputs.setValue(outputVector);
-		// add outputs to map
+		AttributeHandleValueMap attributes = rtiAmbassador
+				.getAttributeHandleValueMapFactory().create(1);
+		
+		// set HLA data element value and add to map
+		input.setValue(inputValue);
 		attributes.put(rtiAmbassador.getAttributeHandle(
-				rtiAmbassador.getObjectClassHandle(managerClassName), 
-				outputAttributeName), 
-				outputs.toByteArray());
-		// use HLA service to update attribute values using map
+				rtiAmbassador.getObjectClassHandle(designerClassName), 
+				inputAttributeName), input.toByteArray());
+		System.out.println("Designer " + (index.getValue()+1) + 
+				" Log: setting input value to " + input.getValue());
+		
+		// use RTI service to update attribute values using map
+		rtiAmbassador.updateAttributeValues(
+				rtiAmbassador.getObjectInstanceHandle(objectInstanceName), 
+				attributes, new byte[0]);
+	}
+	
+	/**
+	 * Update ready attribute.
+	 *
+	 * @param readyValue the ready value
+	 * @throws FederateNotExecutionMember the federate not execution member
+	 * @throws NotConnected the not connected
+	 * @throws NameNotFound the name not found
+	 * @throws InvalidObjectClassHandle the invalid object class handle
+	 * @throws RTIinternalError the RTI internal error
+	 * @throws EncoderException the encoder exception
+	 * @throws AttributeNotOwned the attribute not owned
+	 * @throws AttributeNotDefined the attribute not defined
+	 * @throws ObjectInstanceNotKnown the object instance not known
+	 * @throws SaveInProgress the save in progress
+	 * @throws RestoreInProgress the restore in progress
+	 */
+	public void updateStateAttribute(boolean readyValue) 
+			throws FederateNotExecutionMember, NotConnected, NameNotFound, 
+			InvalidObjectClassHandle, RTIinternalError, EncoderException, 
+			AttributeNotOwned, AttributeNotDefined, ObjectInstanceNotKnown, 
+			SaveInProgress, RestoreInProgress {
+		// create an attribute handle value map to store data
+		AttributeHandleValueMap attributes = rtiAmbassador
+				.getAttributeHandleValueMapFactory().create(1);
+		
+		// set HLA data element value and add to map
+		ready.setValue(readyValue);
+		attributes.put(rtiAmbassador.getAttributeHandle(
+				rtiAmbassador.getObjectClassHandle(designerClassName), 
+				readyAttributeName), ready.toByteArray());
+		System.out.println("Designer " + (index.getValue()+1) + 
+				" Log: setting ready value to " + ready.getValue());
+		
+		// use RTI service to update attribute values using map
 		rtiAmbassador.updateAttributeValues(
 				rtiAmbassador.getObjectInstanceHandle(objectInstanceName), 
 				attributes, new byte[0]);

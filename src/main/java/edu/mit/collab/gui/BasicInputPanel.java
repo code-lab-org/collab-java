@@ -1,4 +1,19 @@
-package edu.mit.collab.util;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -15,8 +30,14 @@ import javax.swing.border.BevelBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+import edu.mit.collab.event.InputEvent;
+import edu.mit.collab.event.InputListener;
+import edu.mit.collab.util.Utilities;
+
 /**
- * The Class BasicInputPanel.
+ * A basic panel that presents designer inputs.
+ * 
+ * @author Paul T. Grogan
  */
 public class BasicInputPanel extends InputPanel {
 	private static final long serialVersionUID = -3934341529444058089L;
@@ -120,9 +141,6 @@ public class BasicInputPanel extends InputPanel {
 		}
 	}
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.InputPanel#bindKey(javax.swing.KeyStroke, java.lang.String, javax.swing.Action)
-	 */
 	@Override
 	public void bindKey(KeyStroke keyStroke, String name, Action action) {
 		inputSlider.getInputMap().put(keyStroke, name);
@@ -138,9 +156,6 @@ public class BasicInputPanel extends InputPanel {
 		return inputSlider;
 	}
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.InputPanel#getValue()
-	 */
 	@Override
 	public double getValue() {
 		return inputSlider.getValue()/((double)sliderTicksPerUnit);
@@ -157,42 +172,27 @@ public class BasicInputPanel extends InputPanel {
 		}
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.InputPanel#isReady()
-	 */
 	@Override
 	public boolean isReady() {
 		return ready;
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.InputPanel#requestFocus()
-	 */
 	@Override
 	public void requestFocus() {
 		inputSlider.requestFocus();
 	}
 	
-	/* (non-Javadoc)
-	 * @see javax.swing.JComponent#setEnabled(boolean)
-	 */
 	@Override
 	public void setEnabled(boolean enabled) {
 		inputSlider.setEnabled(enabled);
 	}
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.InputPanel#setReady(boolean)
-	 */
 	@Override
 	public void setReady(boolean ready) {
 		readyLabel.setIcon(ready?readyIcon:null);
 		readyLabel.setText(ready?"Ready!":"");
 	}
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.InputPanel#setValue(double)
-	 */
 	@Override
 	public void setValue(double value) {
 		inputSlider.setValue((int)(sliderTicksPerUnit*value));

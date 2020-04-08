@@ -1,4 +1,19 @@
-package edu.mit.collab.manager;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.core;
 
 import org.apache.commons.math3.linear.RealVector;
 
@@ -9,7 +24,7 @@ import org.apache.commons.math3.linear.RealVector;
  * however the other data members (input vector, index number, 
  * and ready status) can be modified.
  * 
- * @author Paul T. Grogan, ptgrogan@mit.edu
+ * @author Paul T. Grogan
  */
 public class Designer {
 	private final String instanceName; // immutable
@@ -27,10 +42,8 @@ public class Designer {
 		this.instanceName = instanceName;
 		index = -1;
 	}
-	
-	/* (non-Javadoc)
-	 * @see java.lang.Object#equals(java.lang.Object)
-	 */
+
+	@Override
 	public synchronized boolean equals(Object o) {
 		// designers are equal if they have the same instance name
 		return (o instanceof Designer) 
@@ -66,10 +79,8 @@ public class Designer {
 	public synchronized String getInstanceName() {
 		return instanceName;
 	}
-	
-	/* (non-Javadoc)
-	 * @see java.lang.Object#hashCode()
-	 */
+
+	@Override
 	public synchronized int hashCode() {
 		// provide new hashcode function to conform to equals method
 		return instanceName.hashCode();
@@ -115,10 +126,8 @@ public class Designer {
 	public synchronized void setReady(boolean ready) {
 		this.ready = ready;
 	}
-	
-	/* (non-Javadoc)
-	 * @see java.lang.Object#toString()
-	 */
+
+	@Override
 	public synchronized String toString() {
 		return "Designer " + index + " (ready: " + ready + 
 				", input: " + input + ")";

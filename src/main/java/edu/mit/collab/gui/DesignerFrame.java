@@ -1,4 +1,19 @@
-package edu.mit.collab.designer;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -34,12 +49,12 @@ import javax.swing.SwingUtilities;
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealVector;
 
-import edu.mit.collab.util.InputEvent;
-import edu.mit.collab.util.InputListener;
-import edu.mit.collab.util.InputPanel;
-import edu.mit.collab.util.InputPanelFactory;
-import edu.mit.collab.util.OutputPanel;
-import edu.mit.collab.util.OutputPanelFactory;
+import edu.mit.collab.core.Manager;
+import edu.mit.collab.event.InputEvent;
+import edu.mit.collab.event.InputListener;
+import edu.mit.collab.event.ManagerEvent;
+import edu.mit.collab.event.ManagerListener;
+import edu.mit.collab.hla.DesignerAmbassador;
 import edu.mit.collab.util.Utilities;
 import hla.rti1516e.exceptions.RTIinternalError;
 
@@ -48,7 +63,7 @@ import hla.rti1516e.exceptions.RTIinternalError;
  * controls the assigned model inputs and provides feedback on assigned 
  * outputs.
  * 
- * @author Paul T. Grogan, ptgrogan@mit.edu
+ * @author Paul T. Grogan
  */
 public class DesignerFrame extends JFrame 
 		implements ManagerListener, InputListener {
@@ -484,9 +499,6 @@ public class DesignerFrame extends JFrame
 	
 	private Component lastFocusOwner;
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.InputListener#inputChanged(edu.mit.collab.util.InputEvent)
-	 */
 	@Override
 	public void inputChanged(InputEvent event) {
 		if(mode == Mode.Initialized || mode == Mode.Running) {
@@ -517,9 +529,6 @@ public class DesignerFrame extends JFrame
 		}
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.designer.ManagerListener#managerAdded(edu.mit.collab.designer.ManagerEvent)
-	 */
 	@Override
 	public void managerAdded(final ManagerEvent e) {
 		// act on the event in the swing event thread
@@ -534,9 +543,6 @@ public class DesignerFrame extends JFrame
 		});
 	}
 
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.designer.ManagerListener#managerModelModified(edu.mit.collab.designer.ManagerEvent)
-	 */
 	@Override
 	public void managerModelModified(final ManagerEvent e) {
 		// act on the event in the swing event thread
@@ -551,9 +557,6 @@ public class DesignerFrame extends JFrame
 		});
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.designer.ManagerListener#managerOutputModified(edu.mit.collab.designer.ManagerEvent)
-	 */
 	@Override
 	public void managerOutputModified(final ManagerEvent e) {
 		// act on the event in the swing event thread
@@ -572,9 +575,6 @@ public class DesignerFrame extends JFrame
 		});
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.designer.ManagerListener#managerRemoved(edu.mit.collab.designer.ManagerEvent)
-	 */
 	@Override
 	public void managerRemoved(final ManagerEvent e) {
 		SwingUtilities.invokeLater(new Runnable() {

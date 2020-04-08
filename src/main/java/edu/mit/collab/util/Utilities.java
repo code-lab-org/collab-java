@@ -1,3 +1,18 @@
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
 package edu.mit.collab.util;
 
 import java.awt.Color;
@@ -32,13 +47,13 @@ import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 
-import edu.mit.collab.manager.Experiment;
+import edu.mit.collab.core.Experiment;
 
 /**
  * An abstract class used to access utility functions such as JSON
  * reading and writing.
  * 
- * @author Paul T. Grogan, ptgrogan@mit.edu
+ * @author Paul T. Grogan
  */
 public abstract class Utilities {
     public static String PROPERTIES_PATH = "resources/config.properties";
@@ -70,6 +85,11 @@ public abstract class Utilities {
 			new Rectangle(-4,-4,8,8),
 			new Polygon(new int[]{-4,0,4}, new int[]{3,-6,3},3)};
 	
+	/**
+	 * Gets the gson.
+	 *
+	 * @return the gson
+	 */
 	public static Gson getGson() {
 	  // a Gson builder object which is configured to work with the
 	  // mathematical vector and matrix classes
@@ -218,9 +238,9 @@ public abstract class Utilities {
 	/**
 	 * Reads a JSON-formatted experiment object from file.
 	 *
-	 * @param filepath the filepath
+	 * @param file the file
 	 * @return the experiment
-	 * @throws IOException 
+	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	public static Experiment readExperiment(File file) throws IOException {
 		// create a string-builder to efficiently read in JSON data
@@ -246,6 +266,7 @@ public abstract class Utilities {
 	 *
 	 * @param experiment the experiment
 	 * @param file the file
+	 * @throws IOException Signals that an I/O exception has occurred.
 	 */
 	public static void writeExperiment(Experiment experiment, File file) 
 			throws IOException {

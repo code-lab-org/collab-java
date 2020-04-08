@@ -1,20 +1,40 @@
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
 package edu.mit.collab;
 
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import org.apache.log4j.Logger;
+
 import com.jgoodies.looks.plastic.Plastic3DLookAndFeel;
 
-import edu.mit.collab.designer.DesignerFrame;
+import edu.mit.collab.gui.DesignerFrame;
 import hla.rti1516e.exceptions.RTIinternalError;
 
 /**
- * The main class to launch a designer GUI.
+ * The main class to launch a designer GUI. Expects one argument that specifies
+ * the designer index (base 0).
  * 
- * @author Paul T. Grogan, pgrogan@stevens.edu
+ * @author Paul T. Grogan
  */
 public class DesignerMain {
+	private static Logger logger = Logger.getLogger(DesignerMain.class);
+	
 	/**
 	 * The main method to launch the designer application.
 	 *
@@ -35,7 +55,7 @@ public class DesignerMain {
 		try {
 			UIManager.setLookAndFeel(new Plastic3DLookAndFeel());
 		} catch (UnsupportedLookAndFeelException e) {
-			e.printStackTrace();
+			logger.error(e);
 		}
 
 		// start designer frame in java swing thread
@@ -48,7 +68,7 @@ public class DesignerMain {
 					f.pack();
 					f.setVisible(true);
 				} catch (RTIinternalError ex) {
-					ex.printStackTrace();
+					logger.error(ex);
 				}
 			}
 		});

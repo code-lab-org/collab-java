@@ -1,20 +1,36 @@
-package edu.mit.collab.util;
+/******************************************************************************
+ * Copyright 2020 Paul T. Grogan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *          http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************/
+package edu.mit.collab.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.FlowLayout;
-import java.awt.Font;
 import java.awt.Graphics;
 
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
-import javax.swing.JPanel;
 import javax.swing.JSlider;
 
+import edu.mit.collab.util.Utilities;
+
 /**
- * The Class QuantitativeOutputPanel.
+ * A basic panel that presents design output parameters.
+ * 
+ * @author Paul T. Grogan
  */
-public class QuantitativeOutputPanel extends OutputPanel {
+public class BasicOutputPanel extends OutputPanel {
 	private static final long serialVersionUID = -3934341529444058089L;
 	private static final int sliderTicksPerUnit = 1000;
 	private static final double maxValue = 1.05d, minValue = -1.05d;
@@ -28,7 +44,6 @@ public class QuantitativeOutputPanel extends OutputPanel {
 	
 	private final double targetOutput; // immutable
 	private final JSlider outputSlider; // mutable
-	private final JLabel scoreLabel; // mutable
 	private final JLabel signalLabel; // mutable
 	private boolean withinTargetRange; // mutable
 	
@@ -39,8 +54,9 @@ public class QuantitativeOutputPanel extends OutputPanel {
 	 * @param outputIndex the output index
 	 * @param targetOutput the target output
 	 * @param outputValue the output value
+	 * @param label the label
 	 */
-	public QuantitativeOutputPanel(int designerIndex, int outputIndex, 
+	public BasicOutputPanel(int designerIndex, int outputIndex, 
 			final double targetOutput, double outputValue, String label) {
 		this.targetOutput = targetOutput;
 		
@@ -52,9 +68,6 @@ public class QuantitativeOutputPanel extends OutputPanel {
 				(int)(sliderTicksPerUnit*maxValue)) {
 			private static final long serialVersionUID = -1430242296899154851L;
 			
-			/* (non-Javadoc)
-			 * @see javax.swing.JComponent#paintComponent(java.awt.Graphics)
-			 */
 			@Override
 			public void paintComponent(Graphics g) {
 				Graphics g2 = g.create();
@@ -81,36 +94,19 @@ public class QuantitativeOutputPanel extends OutputPanel {
 		add(new JLabel(label, Utilities.getUserIcon(designerIndex), 
 				JLabel.CENTER), BorderLayout.WEST);
 		
-		// create and add panel on right side
-		JPanel eastPanel = new JPanel();
-		eastPanel.setLayout(new FlowLayout());
-		add(eastPanel, BorderLayout.EAST);
-		
-		// create and add score label to the right side
-		scoreLabel = new JLabel();
-		scoreLabel.setHorizontalAlignment(JLabel.CENTER);
-		scoreLabel.setFont(new Font(Font.MONOSPACED, Font.BOLD, 12));
-		eastPanel.add(scoreLabel);
-		
 		// create and add signal label to the right side
 		signalLabel = new JLabel();
-		eastPanel.add(signalLabel);
+		add(signalLabel, BorderLayout.EAST);
 		
 		// initialize the value of the slider
 		setValue(outputValue);
 	}
 	
-	/* (non-Javadoc)
-	 * @see javax.swing.JComponent#setEnabled(boolean)
-	 */
 	@Override
 	public void setEnabled(boolean enabled) {
 		outputSlider.setEnabled(enabled);
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.OutputPanel#setValue(double)
-	 */
 	@Override
 	public void setValue(double value) {
 		outputSlider.setValue((int)(sliderTicksPerUnit*value));
@@ -120,10 +116,6 @@ public class QuantitativeOutputPanel extends OutputPanel {
 		
 		// check if output is outside visible range
 		boolean outOfRange = value < minValue || value > maxValue;
-		
-		// update score label
-		scoreLabel.setText(String.format("%5.0f",Math.max(0, 
-				1e4 - 1e4*Math.abs(value - targetOutput)/2)));
 		
 		// update signal label
 		signalLabel.setIcon(withinTargetRange?withinRangeIcon:outOfRangeIcon);
@@ -135,17 +127,11 @@ public class QuantitativeOutputPanel extends OutputPanel {
 							new Color(0xff,0xcc,0xcc));
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.OutputPanel#isWithinRange()
-	 */
 	@Override
 	public boolean isWithinRange() {
 		return withinTargetRange;
 	}
 	
-	/* (non-Javadoc)
-	 * @see edu.mit.collab.util.OutputPanel#getValue()
-	 */
 	@Override
 	public double getValue() {
 		return outputSlider.getValue()/((double)sliderTicksPerUnit);
